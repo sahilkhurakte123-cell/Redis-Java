@@ -56,13 +56,20 @@ public class RedisServer {
                     String value = args[1];
                     out.write(("$" + value.length() + "\r\n" + value + "\r\n").getBytes());
                 }
-                 else if (command.equalsIgnoreCase("SET")) {
+                else if (command.equalsIgnoreCase("SET")) {
                     String key = args[1];
                     String value = args[2];
-                    database.set(key, value);
-                    out.write("+OK\r\n".getBytes());
 
-                } else if (command.equalsIgnoreCase("GET")) {
+                    // SET key value PX <ms>  ->  args = ["SET","key","value","PX","5000"], length 5
+                    if (args.length >= 5 && args[3].equalsIgnoreCase("PX")) {
+                        long ttlMillis = Long.parseLong(args[4]);
+                        database.set(key, value, ttlMillis);
+                    } else {
+                        database.set(key, value);
+                    }
+                    out.write("+OK\r\n".getBytes());
+                }
+                else if (command.equalsIgnoreCase("GET")) {
                     String value = database.get(args[1]);
                     if (value == null) {
                         out.write("$-1\r\n".getBytes());       // null bulk string — "no such key"

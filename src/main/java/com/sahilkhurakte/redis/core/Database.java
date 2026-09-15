@@ -4,21 +4,27 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Database {
 
-    private final ConcurrentHashMap<String,String> map = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String,RedisValue> map = new ConcurrentHashMap<>();
 
     public void set(String key, String value) {
-        map.put(key, value);
+        map.put(key, new RedisValue(value, null)); // null = no expiry
+    }
+
+    public void set(String key, String value, long ttlMillis) {
+        long expiresAt = System.currentTimeMillis() + ttlMillis;
+        map.put(key, new RedisValue(value, expiresAt));
     }
 
     public String get(String key) {
-        if(!map.containsKey(key)) return null;
-        return map.get(key);
+        RedisValue value = getLive(key);
+        return value == null ? null : value.value();
     }
 
     public int del(String... keys) {
         int removed = 0;
         for (String key : keys) {
-            if (map.remove(key) != null) {
+            if (getLive(key) != null) {
+                map.remove(key);
                 removed++;
             }
         }
@@ -28,10 +34,23 @@ public class Database {
     public int exists(String... keys) {
         int count = 0;
         for (String key : keys) {
-            if (map.containsKey(key)) {
+            if (getLive(key) != null) {
                 count++;
             }
         }
         return count;
+    }
+
+    private RedisValue getLive(String key) {
+        RedisValue value = map.get(key);
+        if (value == null) {
+            return null;
+        }
+        if(value.expiresAt() != null && value.expiresAt() <= System.currentTimeMillis()) {
+            // Already expired
+            map.remove(key);
+            return null;
+        }
+        return value;
     }
 }
