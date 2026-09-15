@@ -1,6 +1,8 @@
 package com.sahilkhurakte.redis.server;
 
-import java.io.IOException;
+import com.sahilkhurakte.redis.protocol.RespParser;
+
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -36,8 +38,23 @@ public class RedisServer {
     }
 
     private void handleClient(Socket client) {
+        RespParser parser = new RespParser();
+        try (client; OutputStream out = client.getOutputStream()) {
+            InputStream in = client.getInputStream();
 
-        try (client) {
+            String[] args;
+            while ((args = parser.parseCommand(in)) != null) {
+                System.out.println("received: " + String.join(" ", args));
+
+                String command = args[0];
+                if (command.equalsIgnoreCase("PING")) {
+                    out.write("+PONG\r\n".getBytes());
+                } else if (command.equalsIgnoreCase("ECHO")) {
+                    String value = args[1];
+                    out.write(("$" + value.length() + "\r\n" + value + "\r\n").getBytes());
+                }
+                out.flush();
+            }
 
         } catch (IOException e) {
             System.out.println("client error: " + e.getMessage());
