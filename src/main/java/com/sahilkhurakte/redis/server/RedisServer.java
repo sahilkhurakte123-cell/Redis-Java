@@ -1,14 +1,17 @@
 package com.sahilkhurakte.redis.server;
 
+import com.sahilkhurakte.redis.core.Database;
 import com.sahilkhurakte.redis.protocol.RespParser;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Arrays;
 
 public class RedisServer {
 
     private final int port;
+    private final Database database = new Database();
     public RedisServer(int port) {
         this.port = port;
     }
@@ -52,6 +55,30 @@ public class RedisServer {
                 } else if (command.equalsIgnoreCase("ECHO")) {
                     String value = args[1];
                     out.write(("$" + value.length() + "\r\n" + value + "\r\n").getBytes());
+                }
+                 else if (command.equalsIgnoreCase("SET")) {
+                    String key = args[1];
+                    String value = args[2];
+                    database.set(key, value);
+                    out.write("+OK\r\n".getBytes());
+
+                } else if (command.equalsIgnoreCase("GET")) {
+                    String value = database.get(args[1]);
+                    if (value == null) {
+                        out.write("$-1\r\n".getBytes());       // null bulk string — "no such key"
+                    } else {
+                        out.write(("$" + value.length() + "\r\n" + value + "\r\n").getBytes());
+                    }
+
+                } else if (command.equalsIgnoreCase("DEL")) {
+                    String[] keys = Arrays.copyOfRange(args, 1, args.length); // everything after the command name
+                    int removed = database.del(keys);
+                    out.write((":" + removed + "\r\n").getBytes());           // RESP integer reply
+
+                } else if (command.equalsIgnoreCase("EXISTS")) {
+                    String[] keys = Arrays.copyOfRange(args, 1, args.length);
+                    int count = database.exists(keys);
+                    out.write((":" + count + "\r\n").getBytes());
                 }
                 out.flush();
             }
